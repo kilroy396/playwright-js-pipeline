@@ -1,0 +1,42 @@
+# Pipeline to run Playwright tests against a D365 environment
+
+stages:
+  - stage: RunTests
+    dependsOn: []
+    jobs:
+      - job: Run_E2E_UI_Tests
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: NodeTool@0
+            displayName: "Install Node.js"
+            inputs:
+              versionSpec: "18"
+          - checkout: self
+          - task: Bash@3
+            displayName: "Run UI tests"
+            inputs:
+              targetType: "inline"
+              failOnStderr: true
+              script: |
+                npm ci
+                npx playwright install --with-deps chromium
+                npx playwright test
+            env:
+              CI: true
+          - task: PublishTestResults@2
+            displayName: "Publish test results"
+            inputs:
+              searchFolder: "test-results"
+              testResultsFormat: "JUnit"
+              testResultsFiles: "e2e-junit-results.xml"
+              mergeTestResults: true
+              failTaskOnFailedTests: true
+              testRunTitle: "End-To-End Tests"
+            condition: succeededOrFailed()
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish test artifacts"
+            inputs:
+              targetPath: $(Pipeline.Workspace)/playwright-report
+              publishLocation: "pipeline"
+            condition: failed()
